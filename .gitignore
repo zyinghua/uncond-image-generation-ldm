@@ -1,0 +1,6 @@
+# Default ignored files
+.idea/
+.ipynb_checkpoints/
+.DS_Store
+playground.py
+playground1.py
