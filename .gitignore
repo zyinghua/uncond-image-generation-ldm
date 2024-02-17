@@ -4,3 +4,5 @@
 .DS_Store
 playground.py
 playground1.py
+src/__pycache__/
+src/diffusers.egg-info/

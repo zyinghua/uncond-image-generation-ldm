@@ -2,17 +2,28 @@
 
 Creating a training image set is [described in a different document](https://huggingface.co/docs/datasets/image_process#image-datasets).
 
+### Cloning to local
+```bash
+git clone https://github.com/zyinghua/uncond-image-generation-ldm.git
+```
+
 ### Installing the dependencies
 
 Before running the scripts, make sure to install the library's training dependencies:
 
 **Important**
 
-To make sure you can successfully run the latest versions of the example scripts, we highly recommend **installing from source** and keeping the install up to date as we update the example scripts frequently and install some example-specific requirements. To do this, execute the following steps in a new virtual environment:
+This code repo is not independent yet and depends on the huggingface/diffusers library. Therefore please also install the diffusers library from source and keep in the same repository as this one.
+
+To make sure you can successfully run the latest versions of the example scripts, we highly recommend **installing from source** and keeping the install up to date as the huggingface team updates the example scripts frequently and install some example-specific requirements. To do this, execute the following steps in a new virtual environment:
 ```bash
-git clone https://github.com/zyinghua/uncond-image-generation-ldm.git
-cd uncond-image-generation-ldm
+git clone https://github.com/huggingface/diffusers
+cd diffusers
 pip install .
+```
+
+Then navigate to the uncond-image-generation-ldm folder containing the training script and install the required dependencies:
+```bash
 pip install -r requirements.txt
 ```
 

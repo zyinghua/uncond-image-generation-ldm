@@ -103,7 +103,7 @@ def parse_args():
     parser.add_argument(
         "--resolution",
         type=int,
-        default=64,
+        default=256,
         help=(
             "The resolution for input images, all the images in the train/validation dataset will be resized to this"
             " resolution"
@@ -380,9 +380,11 @@ def main(args):
     # Freeze the VAE model
     vae.requires_grad_(False)
 
+    vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
+
     # Initialize the model
     if args.model_config_name_or_path is None:
-        model = UNet2DModel(sample_size=args.resolution,
+        model = UNet2DModel(sample_size=args.resolution // vae_scale_factor,
                             in_channels=4, out_channels=4)
     else:
         config = UNet2DModel.load_config(args.model_config_name_or_path)
@@ -454,7 +456,7 @@ def main(args):
             split="train",
         )
     elif args.train_data_files is not None:
-        dataset = load_dataset("imagefolder", data_files=args.train_data_files)
+        dataset = load_dataset("imagefolder", data_files=args.train_data_files, split="train")
     else:
         dataset = load_dataset("imagefolder", data_dir=args.train_data_dir, cache_dir=args.cache_dir, split="train")
         # See more about loading custom images at
@@ -560,7 +562,7 @@ def main(args):
 
             clean_images = batch["input"].to(weight_dtype)
             latents = vae.encode(clean_images).latent_dist.sample()
-            latents = latents * 0.18215
+            latents = latents * vae.config.scaling_factor
 
             # Sample noise that we'll add to the images
             noise = torch.randn(latents.shape, dtype=weight_dtype, device=latents.device)
