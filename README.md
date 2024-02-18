@@ -25,6 +25,7 @@ pip install .
 Then navigate to the uncond-image-generation-ldm folder containing the training script and install the required dependencies:
 ```bash
 pip install -r requirements.txt
+pip install peft
 ```
 
 And initialize an [🤗Accelerate](https://github.com/huggingface/accelerate/) environment with:
