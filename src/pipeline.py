@@ -5,12 +5,13 @@ from typing import Callable, List, Optional, Union, Tuple
 import torch
 import torch.nn as nn
 from diffusers import (
-    AutoencoderKL,
+    VQModel,
     UNet2DModel,
 )
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from diffusers.schedulers import (
     DDIMScheduler,
+    DDPMScheduler,
     DPMSolverMultistepScheduler,
     EulerAncestralDiscreteScheduler,
     EulerDiscreteScheduler,
@@ -23,7 +24,7 @@ from diffusers.utils.torch_utils import randn_tensor
 
 class LatentDiffusionPipelineBase(DiffusionPipeline):
     def decode_latents(self, latents):
-        latents = 1 / self.vae.config.scaling_factor * latents
+        latents = latents / 0.18215
         image = self.vae.decode(latents, return_dict=False)[0]
         image = (image / 2 + 0.5).clamp(0, 1)
         # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
@@ -71,17 +72,18 @@ class LatentDiffusionPipelineBase(DiffusionPipeline):
 
 class UncondLatentDiffusionPipeline(LatentDiffusionPipelineBase):
     def __init__(
-        self,
-        vae: AutoencoderKL,
-        scheduler: Union[
-            DDIMScheduler,
-            DPMSolverMultistepScheduler,
-            EulerAncestralDiscreteScheduler,
-            EulerDiscreteScheduler,
-            LMSDiscreteScheduler,
-            PNDMScheduler,
-        ],
-        unet: UNet2DModel,
+            self,
+            vae: VQModel,
+            scheduler: Union[
+                DDIMScheduler,
+                DDPMScheduler,
+                DPMSolverMultistepScheduler,
+                EulerAncestralDiscreteScheduler,
+                EulerDiscreteScheduler,
+                LMSDiscreteScheduler,
+                PNDMScheduler,
+            ],
+            unet: UNet2DModel,
     ):
         super().__init__()
 
@@ -91,10 +93,7 @@ class UncondLatentDiffusionPipeline(LatentDiffusionPipelineBase):
             scheduler=scheduler,
         )
 
-        if vae is not None:
-            self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-        else:
-            self.vae_scale_factor = 1
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
     @torch.no_grad()
     def __call__(
@@ -120,7 +119,7 @@ class UncondLatentDiffusionPipeline(LatentDiffusionPipelineBase):
                 f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
             )
 
-        latents = self.prepare_latents(batch_size, 4, height, width,
+        latents = self.prepare_latents(batch_size, 3, height, width,
                                        self.unet.dtype, self.device, generator, latents)
 
         self.scheduler.set_timesteps(num_inference_steps)
@@ -129,6 +128,8 @@ class UncondLatentDiffusionPipeline(LatentDiffusionPipelineBase):
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
         for t in self.progress_bar(self.scheduler.timesteps):
+            latents = self.scheduler.scale_model_input(latents, t)
+
             noise_pred = self.unet(
                 latents,
                 t,
