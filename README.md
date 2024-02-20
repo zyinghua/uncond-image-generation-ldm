@@ -41,10 +41,10 @@ The command to train a DDPM UNet model on the Oxford Flowers dataset:
 ```bash
 accelerate launch train.py \
   --dataset_name="huggan/flowers-102-categories" \
-  --resolution=64 --center_crop --random_flip \
-  --output_dir="ddpm-ema-flowers-64" \
+  --resolution=256 \
+  --output_dir="ddpm-ema-flowers-256" \
   --train_batch_size=16 \
-  --num_epochs=100 \
+  --num_epochs=150 \
   --gradient_accumulation_steps=1 \
   --use_ema \
   --learning_rate=1e-4 \
@@ -55,22 +55,23 @@ accelerate launch train.py \
 
 ### Training with multiple GPUs
 
-`accelerate` allows for seamless multi-GPU training. Follow the instructions [here](https://huggingface.co/docs/accelerate/basic_tutorials/launch)
+`accelerate` allows for seamless multi-GPU training. After setting up with `accelerate config`,
+simply add `--multi_gpu` in the command. For more information, follow the instructions [here](https://huggingface.co/docs/accelerate/basic_tutorials/launch)
 for running distributed training with `accelerate`. Here is an example command:
 
 ```bash
-accelerate launch --mixed_precision="fp16" --multi_gpu train.py \
-  --dataset_name="huggan/pokemon" \
-  --resolution=64 --center_crop --random_flip \
-  --output_dir="ddpm-ema-pokemon-64" \
+accelerate launch --multi_gpu train.py \
+  --dataset_name="huggan/flowers-102-categories" \
+  --resolution=256 \
+  --output_dir="ddpm-ema-flowers-256" \
   --train_batch_size=16 \
-  --num_epochs=100 \
+  --num_epochs=150 \
   --gradient_accumulation_steps=1 \
   --use_ema \
   --learning_rate=1e-4 \
   --lr_warmup_steps=500 \
-  --mixed_precision="fp16" \
-  --logger="wandb"
+  --mixed_precision=no \
+  --push_to_hub
 ```
 
 To be able to use Weights and Biases (`wandb`) as a logger you need to install the library: `pip install wandb`.
@@ -79,7 +80,7 @@ To be able to use Weights and Biases (`wandb`) as a logger you need to install t
 
 To use your own dataset, there are 3 ways:
 - you can either provide your own folder as `--train_data_dir`
-- or you can provide your own .zip file containing the data as '--train_data_files'
+- or you can provide your own .zip file containing the data as `--train_data_files`
 - or you can upload your dataset to the hub (possibly as a private repo, if you prefer so), and simply pass the `--dataset_name` argument.
 
 Below, we explain both in more detail.
