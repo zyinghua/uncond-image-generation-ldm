@@ -8,8 +8,8 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 
 from diffusers.utils.logging import tqdm
 
-dataset_path = "./102flowers-processed256"
-model_id = "basilevh/ddpm-ema-flowers-256-noac"
+dataset_path = "./102flowers"
+model_id = "./ddpm-ema-flowers-256"
 num_inference_steps = 1000
 batch_size = 16
 device = (
@@ -25,6 +25,7 @@ def preprocess_image(image):
     image = torch.tensor(image).unsqueeze(0)
     image = image.permute(0, 3, 1, 2) / 255.0
     return F.center_crop(image, [256, 256])
+
 
 print("Loading real images...")
 
@@ -43,8 +44,8 @@ fake_images = torch.tensor([]).to(device)
 for _ in tqdm(range(0, len(real_images), batch_size)):
     current_batch_size = min(batch_size, len(real_images) - len(fake_images))
     batch_images = pipeline(batch_size=current_batch_size, num_inference_steps=num_inference_steps).images
-    batch_images = torch.tensor(batch_images).permute(0, 2, 3, 1)  # Change shape to [N, H, W, C] if needed
-    fake_images.cat(batch_images.cpu().detach().numpy())  # Move images to CPU and convert to numpy
+    batch_images = torch.tensor([np.array(img) for img in batch_images]) / 255.0
+    fake_images = torch.cat([fake_images, batch_images.permute(0, 3, 1, 2).to(device)])
 
 print("Images generation end. Shape:", fake_images.shape)
 print("***********************************************\n")
