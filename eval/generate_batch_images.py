@@ -5,10 +5,10 @@ import numpy as np
 from PIL import Image
 import os
 
-model_id = "./ddpm-ema-flowers-256"
+model_id = "../../ddpm-ema-flowers-256"
 output_dir = "./102flowers-generated"
 num_inference_steps = 1000
-num_images = 8189
+num_images = 16
 per_batch_size = 16
 device = (
     "mps"

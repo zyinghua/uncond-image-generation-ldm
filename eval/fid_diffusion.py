@@ -8,10 +8,9 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 
 from diffusers.utils.logging import tqdm
 
-dataset_path = "./102flowers"
-model_id = "./ddpm-ema-flowers-256"
-num_inference_steps = 1000
-batch_size = 16
+real_dataset_path = "./102flowers-processed256"
+fake_dataset_path = "./102flowers-generated"
+
 device = (
     "mps"
     if torch.backends.mps.is_available()
@@ -29,26 +28,19 @@ def preprocess_image(image):
 
 print("Loading real images...")
 
-image_paths = sorted([os.path.join(dataset_path, x) for x in os.listdir(dataset_path)])
-real_images = [np.array(Image.open(path).convert("RGB")) for path in image_paths]
+real_image_paths = sorted([os.path.join(real_dataset_path, x) for x in os.listdir(real_dataset_path)])
+real_images = [np.array(Image.open(path).convert("RGB")) for path in real_image_paths]
 real_images = torch.cat([preprocess_image(image) for image in real_images])
 print("Finished loading real images. Real images shape:", real_images.shape)
 
 print("\n***********************************************")
-print("Loading model...")
-pipeline = DiffusionPipeline.from_pretrained(model_id).to(device)
+print("Loading fake images...")
 
-print("Start generating images...")
-fake_images = torch.tensor([]).to(device)
+fake_image_paths = sorted([os.path.join(fake_dataset_path, x) for x in os.listdir(fake_dataset_path)])
+fake_images = [np.array(Image.open(path).convert("RGB")) for path in fake_image_paths]
+fake_images = torch.cat([preprocess_image(image) for image in fake_images])
+print("Finished loading fake images. Fake images shape:", fake_images.shape)
 
-for _ in tqdm(range(0, len(real_images), batch_size)):
-    current_batch_size = min(batch_size, len(real_images) - len(fake_images))
-    batch_images = pipeline(batch_size=current_batch_size, num_inference_steps=num_inference_steps).images
-    batch_images = torch.tensor([np.array(img) for img in batch_images]) / 255.0
-    fake_images = torch.cat([fake_images, batch_images.permute(0, 3, 1, 2).to(device)])
-
-print("Images generation end. Shape:", fake_images.shape)
-print("***********************************************\n")
 print("Start evaluating FID...")
 
 fid = FrechetInceptionDistance(normalize=True)

@@ -28,6 +28,7 @@ def num_range(s: str) -> List[int]:
 @click.command()
 @click.pass_context
 @click.option('--pipeline', 'pipeline_path', help='Directory path of the pipeline to load', required=True)
+@click.option('--num_inference_steps', 'num_inference_steps', help='Number of inference steps', default=1000)
 @click.option('--degree', 'degree', type=float, default=0.0, help='CVD degree')
 @click.option('--num_images', 'num_images', type=int, help='Total number of images to generate', default=480)
 @click.option('--grid_rows', 'grid_rows', type=int, help='Number of image grid rows', default=16)
@@ -36,6 +37,7 @@ def num_range(s: str) -> List[int]:
 def generate_images(
     ctx: click.Context,
     pipeline_path: str,
+    num_inference_steps: int,
     degree: float,
     num_images: int,
     grid_rows: int,
@@ -68,18 +70,14 @@ def generate_images(
     generated_images = torch.tensor([]).to(device)
 
     for r in range(grid_rows):
-        image_row = torch.tensor([]).to(device)
+        images = pipeline(batch_size=grid_cols, num_inference_steps=num_inference_steps).images # (N, H, W, C)
+        image_row = torch.cat([torch.tensor(np.array(img)) for img in images], dim=1).to(device)
 
-        for c in range(grid_cols):
-            # Generate images.
-            image = pipeline(num_inference_steps=1000).images[0]
-            image_row = torch.cat([image_row, torch.tensor(image)], 3)
+        generated_images = torch.cat([generated_images, image_row], dim=0)
 
-        generated_images = torch.cat([generated_images, image_row], 2)
+    generated_images = generated_images.clamp(0, 255).to(torch.uint8)
 
-    generated_images = generated_images.permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)
-
-    PIL.Image.fromarray(generated_images[0].cpu().numpy(), 'RGB').save(os.path.join(outdir, 'generated_images.png'))
+    PIL.Image.fromarray(generated_images.cpu().numpy(), 'RGB').save(os.path.join(outdir, 'generated_images.png'))
 
 
 
