@@ -24,7 +24,7 @@ from diffusers.utils.torch_utils import randn_tensor
 
 class LatentDiffusionPipelineBase(DiffusionPipeline):
     def decode_latents(self, latents):
-        latents = latents / 0.18215
+        latents = (latents / 0.18215).to(dtype=self.vae.dtype)
         image = self.vae.decode(latents, return_dict=False)[0]
         image = (image / 2 + 0.5).clamp(0, 1)
         # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
@@ -119,19 +119,19 @@ class UncondLatentDiffusionPipeline(LatentDiffusionPipelineBase):
                 f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
             )
 
+        self.scheduler.set_timesteps(num_inference_steps)
+
         latents = self.prepare_latents(batch_size, 3, height, width,
                                        self.unet.dtype, self.device, generator, latents)
-
-        self.scheduler.set_timesteps(num_inference_steps)
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
         for t in self.progress_bar(self.scheduler.timesteps):
-            latents = self.scheduler.scale_model_input(latents, t)
+            latent_model_input = self.scheduler.scale_model_input(latents, t)
 
             noise_pred = self.unet(
-                latents,
+                latent_model_input,
                 t,
             ).sample
 

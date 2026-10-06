@@ -375,7 +375,10 @@ def main(args):
 
         if args.push_to_hub:
             repo_id = create_repo(
-                repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True, token=args.hub_token
+                repo_id=args.hub_model_id or Path(args.output_dir).name,
+                exist_ok=True,
+                token=args.hub_token,
+                private=True if args.hub_private_repo else None,
             ).repo_id
 
     # Load pretrained VAE model
@@ -488,18 +491,20 @@ def main(args):
         dataset, batch_size=args.train_batch_size, shuffle=True, num_workers=args.dataloader_num_workers
     )
 
-    # Initialize the learning rate scheduler
+    model, optimizer, train_dataloader = accelerator.prepare(
+        model, optimizer, train_dataloader
+    )
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    max_train_steps = args.num_epochs * num_update_steps_per_epoch
+
+    step_multiplier = 1 if accelerator.split_batches else accelerator.num_processes
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
-        num_training_steps=(len(train_dataloader) * args.num_epochs),
+        num_warmup_steps=args.lr_warmup_steps * step_multiplier,
+        num_training_steps=max_train_steps * step_multiplier,
     )
-
-    # Prepare everything with our `accelerator`.
-    model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_dataloader, lr_scheduler
-    )
+    lr_scheduler = accelerator.prepare_scheduler(lr_scheduler)
 
     vae = vae.to(accelerator.device, dtype=weight_dtype)
 
@@ -513,8 +518,6 @@ def main(args):
         accelerator.init_trackers(run)
 
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-    max_train_steps = args.num_epochs * num_update_steps_per_epoch
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(dataset)}")
@@ -530,13 +533,15 @@ def main(args):
     # Potentially load in the weights and states from a previous save
     if args.resume_from_checkpoint:
         if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
+            path = args.resume_from_checkpoint
+            if os.path.dirname(path) == "" and not os.path.isdir(path):
+                path = os.path.join(args.output_dir, path)
         else:
             # Get the most recent checkpoint
             dirs = os.listdir(args.output_dir)
             dirs = [d for d in dirs if d.startswith("checkpoint")]
             dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-            path = dirs[-1] if len(dirs) > 0 else None
+            path = os.path.join(args.output_dir, dirs[-1]) if dirs else None
 
         if path is None:
             accelerator.print(
@@ -545,8 +550,8 @@ def main(args):
             args.resume_from_checkpoint = None
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
-            global_step = int(path.split("-")[1])
+            accelerator.load_state(path)
+            global_step = int(Path(path).name.split("-")[1])
 
             resume_global_step = global_step * args.gradient_accumulation_steps
             first_epoch = global_step // num_update_steps_per_epoch
@@ -592,7 +597,7 @@ def main(args):
                     )
                     snr_weights = alpha_t / (1 - alpha_t)
                     # use SNR weighting from distillation paper
-                    loss = snr_weights * F.mse_loss(model_output.float(), clean_images.float(), reduction="none")
+                    loss = snr_weights * F.mse_loss(model_output.float(), latents.float(), reduction="none")
                     loss = loss.mean()
                 else:
                     raise ValueError(f"Unsupported prediction type: {args.prediction_type}")
@@ -713,6 +718,7 @@ def main(args):
                     upload_folder(
                         repo_id=repo_id,
                         folder_path=args.output_dir,
+                        token=args.hub_token,
                         commit_message=f"Epoch {epoch}",
                         ignore_patterns=["step_*", "epoch_*"],
                     )

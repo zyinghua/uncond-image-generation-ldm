@@ -3,3 +3,4 @@ torchvision
 datasets
 diffusers
 peft
+tensorboard
